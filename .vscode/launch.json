@@ -1,0 +1,41 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            //"args": ["direct", "10.0.0.6:7000", "5000", "topic1"]
+
+            //arguments for the lamebroker
+            //e.g. python3 lamebroker.py 2000
+            //"args": ["9000"]
+            
+            //arguments for the broker:listening_port publishing_port
+            //e.g. python3 broker.py 2000 2001
+            //"args": ["4000", "5000"]  
+
+            //argumets for direct strategy publishers 
+            //e.g. python3 publisher_app.py direct "27.0.0.1:2181" "3000" "topic1" "topic2"
+            //"args": ["direct", "127.0.0.1:2181", "8000", "topic1"]             
+
+            //argumets for broker strategy publishers
+            //python3 publisher_app.py broker "27.0.0.1:2181" "topic1"
+            "args": ["broker", "127.0.0.1:2181", "topic1"]  
+
+            //argumets for direct strategy subscribers
+            //e.g. python3 subscriber_app.py direct "27.0.0.1:2181" "topic1"
+            //"args": ["direct", "127.0.0.1:2181", "topic5", "temp", "humidity"]
+
+            //argumets for direct strategy subscribers
+            //e.g. python3 subscriber_app.py broker "27.0.0.1:2181" "topic2"
+            //argumets for broker strategy subscribers
+            //"args": ["broker", "127.0.0.1:2181", "topic1", "topic2"] 
+        }
+    ]
+}
