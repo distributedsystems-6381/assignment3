@@ -13,14 +13,19 @@ class ZkClientService():
         self.kzclient = kzcl.KazooClient(const.ZOO_KEEPER_SERVER_IP_PORT, connection_retry=_retry)
         self.kzclient.start()
 
-    def create_node(self, node_path_to_create, node_value, is_ephemeral, is_sequential):
-        print("Creating node")
+    def create_node(self, node_path_to_create, node_value = None, is_ephemeral = False, is_sequential = False):
+        print("Creating node {}".format(node_path_to_create))
         created_node_path = ""
         try:
             node_stat = self.kzclient.exists(node_path_to_create)
             if node_stat is None:
-                created_node_path = self.kzclient.create(node_path_to_create, node_value.encode('utf-8'), makepath=True,
-                                                         ephemeral=is_ephemeral, sequence=is_sequential)
+                if node_value is None:
+                    node_value = b""
+                else:
+                    node_value = node_value.encode('utf-8')
+
+                created_node_path = self.kzclient.create(node_path_to_create, node_value, makepath=True, 
+                ephemeral=is_ephemeral, sequence=is_sequential)                
             else:
                 created_node_path = node_path_to_create
 
@@ -102,3 +107,6 @@ class ZkClientService():
 
     def stop_kzclient(self):
         self.kzclient.stop()
+
+    
+  

@@ -10,6 +10,18 @@ import constants as const
 import os
 import multiprocessing as mp
 
+brokers_root_path = "/brokers"
+topic_root_path = "/topics"
+
+pubs_root_path = "/pubs"
+subs_root_path = "/subs"
+
+pubs_broker_assignment_root = "/pubsbroker"
+
+publishers_path_prefix = "/pubs/pub_"
+this_publisher_path = ""
+this_pub_broker_node_path = ""
+active_broker_node_value = ""
 process_list = []
 # direct args => python3 publisher_app.py direct {lamebroker_ip:port} {publishing_port} topic1 topic2
 #       e.g. "python3 publisher_app.py direct "10.0.0.6:7000" 5000 topic1 topic2"
@@ -51,7 +63,6 @@ def publish(strategy, topics):
             strategy.publish(topic, topic_data)
         time.sleep(1)
 
-
 # direct implementation
 def direct_messaging_strategy(port, topics):
     subscriber = dmw.DirectPubMiddleware(port)
@@ -66,7 +77,7 @@ def broker_messaging_strategy(ips_ports, topics):
 
 
 # create base topics & extract strategy
-publish_topics = ["temp", "humidity"]
+publish_topics = []
 strategy = sys.argv[1] if len(sys.argv) > 1 else print("Please submit valid strategy (direct || broker)")
 
 if strategy != 'direct' and strategy != 'broker':
@@ -130,31 +141,65 @@ def watch_broker_func(event):
 
 
 def broker_strategy_reconnect_and_publish():
-    # Get the broker_ip_port for the broker strategy
-    active_broker_node_name = kzclient.get_broker_node_name(const.LEADER_ELECTION_ROOT_ZNODE)
-    if active_broker_node_name == "":
-        print("No broker is running, existing the publisher app!")
-        os._exit(0)
+    global active_broker_node_value
+    assigned_broker_node_value = kzclient.get_node_value(this_pub_broker_node_path)
+    if assigned_broker_node_value == active_broker_node_value:
+        print("There is no change in the broker assignment")
+        kzclient.watch_individual_node(this_pub_broker_node_path, watch_publisher_broker_assignment_change)
         return
+    else:
+        active_broker_node_value = assigned_broker_node_value
 
-    active_broker_node_value = kzclient.get_broker(const.LEADER_ELECTION_ROOT_ZNODE)
-    print("Setting watch on leader broker node_path:{}".format(
-        const.LEADER_ELECTION_ROOT_ZNODE + '/' + active_broker_node_name))
-    kzclient.watch_individual_node(const.LEADER_ELECTION_ROOT_ZNODE + '/' + active_broker_node_name, watch_broker_func)
     broker_ip = active_broker_node_value.split(':')[0]
     broker_listening_port = active_broker_node_value.split(':')[1].split(',')[0]
     active_broker_ip_port = broker_ip + ":" + broker_listening_port
-    print("Broker leader is:{}".format(active_broker_ip_port))
+    print("Active broker is:{}".format(active_broker_ip_port))
     thr = mp.Process(target=broker_messaging_strategy, args=(active_broker_ip_port, publish_topics))
     process_list.append(thr)
-    thr.start()
+    thr.start()    
+    kzclient.watch_individual_node(this_pub_broker_node_path, watch_publisher_broker_assignment_change)
 
+def watch_publisher_broker_assignment_change(event):
+    print("Broker assignment changed")
+    if len(process_list) > 0:
+        thr = process_list[0]
+        thr.terminate()
+        process_list.pop(0)
+    broker_strategy_reconnect_and_publish()
 
+def initialize_publisher(topics):
+    topics_str = ','.join(topics)
+    global this_publisher_path
+    this_publisher_path = kzclient.create_node(publishers_path_prefix, topics_str, True, True)
+    this_publisher_name = get_this_publisher_name()
+
+    global this_pub_broker_node_path
+    this_pub_broker_node_path = kzclient.create_node(pubs_broker_assignment_root + "/" + this_publisher_name, None, True)
+    for topic in topics:
+        topic_value = kzclient.get_node_value(topic_root_path + "/" + topic)        
+        if topic_value is not None:
+            topic_pubs = []
+            topic_pubs_subs = topic_value.split('#')
+            if len(topic_pubs_subs) == 1:
+                topic_pubs = topic_pubs_subs
+            else:
+                topic_pubs = topic_pubs_subs[0]
+
+            if topic_pubs.count(this_publisher_name) == 0:
+                topic_pubs.append(this_publisher_name)
+                kzclient.set_node_value(topic_root_path + "/" + topic, ','.join(topic_pubs))                
+        else:
+            kzclient.create_node(topic_root_path + "/" + topic, this_publisher_name)
+    
+    kzclient.watch_individual_node(this_pub_broker_node_path, watch_publisher_broker_assignment_change)
+
+def get_this_publisher_name():
+    return this_publisher_path[len(this_publisher_path) - 14:]
 # initiate messaging based on which strategy is submitted
 if strategy == "direct":
     direct_messaging_strategy(publisher_port, publish_topics)
 elif strategy == "broker":
-    broker_strategy_reconnect_and_publish()
+    initialize_publisher(publish_topics)
 
 while True:
-    time.sleep(1)
+    time.sleep(1000000000)

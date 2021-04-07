@@ -3,7 +3,17 @@ import sys
 import zk_clientservice as kzcl
 import zk_leaderelector as le
 import constants as const
+import time
+import multiprocessing as mp
+import os
+import host_ip_provider as hip
 
+# The process to run the subscribers
+process_list = []
+brokers_root_path = "/brokers"
+brokers_ip_port_root_path = "/brokers_ipport"
+zkclient = kzcl.ZkClientService()
+this_broker_node_path = ""
 
 def run_broker(listening_port, publishing_port):
     print("starting ZMQ broker")
@@ -32,25 +42,44 @@ def run_broker(listening_port, publishing_port):
         backend.close()
         context.term()
 
+def create_broker_node():
+    global this_broker_node_path
+    this_broker_node_path = zkclient.create_node(brokers_root_path + "/" + "broker_", "0",True, True)
+    this_broker_node_name = get_this_broker_name(this_broker_node_path)
+    host_ip = hip.get_host_ip()
+    zkclient.create_node(brokers_ip_port_root_path + "/" + this_broker_node_name, host_ip + ":" + listen + "," + publish, True)
+    print("This broker node path is {}".format(this_broker_node_path))
+    zkclient.watch_individual_node(this_broker_node_path, watch_broker_node_change)
 
-def leader_election_callback(leader_broker_ip_port):
-    print("The current leader is: {}".format(leader_broker_ip_port))
+def get_this_broker_name(this_broker_node_path):
+    return this_broker_node_path[len(this_broker_node_path) - 17:]
 
-
-def elect_leader():
-    # Try to elect a broker leader
-    zk_client_svc = kzcl.ZkClientService()
-    leader_elector = le.LeaderElector(zk_client_svc, const.LEADER_ELECTION_ROOT_ZNODE, const.BROKER_NODE_PREFIX)
-    # The broker node value for broker strategy e.g. node_path = /leaderelection/broker_0000000001, node_value = broker_ip:listening_port,publishing_port
-    # e.g node_value = 10.0.0.5:2000,3000
-    leader_elector.try_elect_leader(leader_election_callback, listen + "," + publish)
-
+def watch_broker_node_change(event):
+    if event.type == "DELETED":
+        return
+    broker_node_value = zkclient.get_node_value(this_broker_node_path)
+    if broker_node_value == "1":
+        print("Promoting {} as active broker".format(this_broker_node_path))
+        thr = mp.Process(target=run_broker, args=(listen, publish))
+        process_list.append(thr)
+        thr.start()        
+    elif broker_node_value == "0":
+        print("Loadbalancer deactivated the broker {}".format(this_broker_node_path))
+        if len(process_list) > 0:
+            thr = process_list[0]
+            thr.terminate()
+            process_list.pop(0)
+    zkclient.watch_individual_node(this_broker_node_path, watch_broker_node_change)
 
 # extract broker config
 listen = sys.argv[1] if len(sys.argv) > 1 else print("Please submit valid port")
 publish = sys.argv[2] if len(sys.argv) > 2 else print("Please submit valid port")
 if publish == listen:
-    print("Listening port and Publishing port cannot be the same")
+    print("Listening port and publishing port cannot be the same")
+    os._exit(0)
 else:
-    elect_leader()
-    run_broker(listen, publish)
+    create_broker_node()
+    zkclient.watch_individual_node(this_broker_node_path, watch_broker_node_change)
+
+while True:
+    time.sleep(1000000000)
