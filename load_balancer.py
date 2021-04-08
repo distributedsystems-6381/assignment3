@@ -202,8 +202,7 @@ def update_publishers_topics_maps(pubs):
         return
     for pub in pubs:
         pub_topics = zkclient.get_node_value(pubs_root_path + "/" + pub)          
-        publishers_topics_map[pub] = pub_topics
-        
+        publishers_topics_map[pub] = pub_topics        
 
 def watch_individual_pub_node(event):
     global publishers_topics_map
@@ -237,8 +236,10 @@ def watch_individual_pub_node(event):
                         zkclient.set_node_value(topic_root_path + "/" + topic, ",".join(topic_pubs) + "#" + ",".join(topic_subs))
                     elif len(topic_pubs) == 0 and len(topic_subs) > 0:
                         zkclient.set_node_value(topic_root_path + "/" + topic, "#" + ",".join(topic_subs))
-                    elif len(topic_pubs) == 0 and topic_subs[0] == 0:   
-                        zkclient.delete_node(topic_root_path + "/" + topic)
+                    elif len(topic_subs) == 0 and len(topic_pubs) > 0:
+                        zkclient.set_node_value(topic_root_path + "/" + topic, ",".join(topic_pubs))
+                    elif len(topic_pubs) == 0 and len(topic_subs) == 0:
+                        zkclient.delete_node(topic_root_path + "/" + topic)                   
 
             publishers_topics_map.pop(pub_node_name) 
     else:

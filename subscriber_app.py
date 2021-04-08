@@ -63,16 +63,13 @@ if len(subscribed_topics) == 0:
     print("Please provide topics to subscribe)")
     sys.exit()
 
-
 def logger_function(message):
     topic_data, message_id, message_sent_at_timestamp, publisher_ip = message.split("#")
     datetime_sent_at = datetime.strptime(message_sent_at_timestamp, '%Y-%m-%dT%H::%M::%S.%f')
     date_diff = datetime.now() - datetime_sent_at
     total_time_taken_milliseconds = date_diff.total_seconds() * 1000
-    print('topic_data: {},'
-          'message_id: {},'
-          'message_sent_at_timestamp: {},'
-          'publisher_ip: {}'.format(topic_data, message_id, datetime_sent_at, publisher_ip))
+    print('topic_data: {},'          
+          'publisher_ip: {}'.format(topic_data, publisher_ip))
 
     output_folder = Path("output/")
     output_file = output_folder / "topic_meta_data.out"

@@ -38,9 +38,7 @@ def run_broker(listening_port, publishing_port):
         print("bringing down ZMQ device")
     finally:
         pass
-        frontend.close()
-        #backend.close()
-        #context.term()
+        frontend.close()        
 
 def create_broker_node():
     global this_broker_node_path
