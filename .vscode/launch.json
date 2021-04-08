@@ -26,16 +26,16 @@
 
             //argumets for broker strategy publishers
             //python3 publisher_app.py broker "27.0.0.1:2181" "topic1"
-            "args": ["broker", "127.0.0.1:2181", "topic1"]  
+            //"args": ["broker", "127.0.0.1:2181", "topic1"]  
 
             //argumets for direct strategy subscribers
             //e.g. python3 subscriber_app.py direct "27.0.0.1:2181" "topic1"
             //"args": ["direct", "127.0.0.1:2181", "topic5", "temp", "humidity"]
 
-            //argumets for direct strategy subscribers
-            //e.g. python3 subscriber_app.py broker "27.0.0.1:2181" "topic2"
             //argumets for broker strategy subscribers
-            //"args": ["broker", "127.0.0.1:2181", "topic1", "topic2"] 
+            //e.g. r
+            //argumets for broker strategy subscribers
+            "args": ["broker", "127.0.0.1:2181", "topic1"] 
         }
     ]
 }

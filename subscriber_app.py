@@ -13,6 +13,14 @@ import multiprocessing as mp
 import time
 import os
 from pathlib import Path
+import errno
+
+subscribers_path_prefix = "/subs/sub_"
+subs_broker_assignment_root = "/subsbroker"
+this_subscriber_path = ""
+this_sub_broker_node_path = ""
+topic_root_path = "/topics"
+active_broker_node_value = ""
 
 '''
  args python3 {direct or broker} {zookeeper_ip:port} topic1 topic2
@@ -55,19 +63,23 @@ if len(subscribed_topics) == 0:
     print("Please provide topics to subscribe)")
     sys.exit()
 
-
 def logger_function(message):
     topic_data, message_id, message_sent_at_timestamp, publisher_ip = message.split("#")
     datetime_sent_at = datetime.strptime(message_sent_at_timestamp, '%Y-%m-%dT%H::%M::%S.%f')
     date_diff = datetime.now() - datetime_sent_at
     total_time_taken_milliseconds = date_diff.total_seconds() * 1000
-    print('topic_data: {},'
-          'message_id: {},'
-          'message_sent_at_timestamp: {},'
-          'publisher_ip: {}'.format(topic_data, message_id, datetime_sent_at, publisher_ip))
+    print('topic_data: {},'          
+          'publisher_ip: {}'.format(topic_data, publisher_ip))
 
     output_folder = Path("output/")
     output_file = output_folder / "topic_meta_data.out"
+    if not os.path.exists(os.path.dirname(output_file)):
+        try:
+            os.makedirs(os.path.dirname(output_file))
+        except OSError as exc: # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
+    
     with open(output_file, mode='a') as topic_meta_data_file:
         topic_meta_data_writer = csv.writer(topic_meta_data_file, delimiter=',', quotechar='"',
                                             quoting=csv.QUOTE_MINIMAL)
@@ -166,33 +178,84 @@ def get_publishers(broker_ip_port):
 
 
 def broker_strategy_reconnect_and_receive():
-    brokers = []
-    # Get active broker_ip_port
-    active_broker_node_name = kzclient.get_broker_node_name(const.LEADER_ELECTION_ROOT_ZNODE)
-    if active_broker_node_name == "":
-        print("No broker is running, existing the subscriber app!")
-        os._exit(0)
+    brokers = []   
+    global active_broker_node_value
+    assigned_broker_node_value = kzclient.get_node_value(this_sub_broker_node_path)
+    if assigned_broker_node_value == active_broker_node_value:
+        print("There is no change in the broker assignment")
+        kzclient.watch_individual_node(this_sub_broker_node_path, watch_subscriber_broker_assignment_change)
         return
-    active_broker_node_value = kzclient.get_broker(const.LEADER_ELECTION_ROOT_ZNODE)
+    else:
+        active_broker_node_value = assigned_broker_node_value
+
+    if len(process_list) > 0:
+        thr = process_list[0]
+        thr.terminate()
+        process_list.pop(0)
+
     # For broker strategy, the broker node_value is in this format, node_value  = broker_ip:listening_port,publishing_port
     # e.g 10.0.0.5:2000,3000 
     broker_ip = active_broker_node_value.split(':')[0]
     broker_publishing_port = active_broker_node_value.split(':')[1].split(',')[1]
+
     active_broker_ip_port = broker_ip + ":" + broker_publishing_port
-    print("Broker leader is publishing message at ip_port:{}".format(active_broker_ip_port))
-    brokers.append(active_broker_ip_port)
-    kzclient.watch_node(const.LEADER_ELECTION_ROOT_ZNODE + '/' + active_broker_node_name, watch_broker_func)
+    print("Broker is publishing message at ip_port:{}".format(active_broker_ip_port))
+    brokers.append(active_broker_ip_port)    
     thr = mp.Process(target=start_receiving_messages, args=(strategy, brokers))
     process_list.append(thr)
     thr.start()
-    # start_receiving_messages(strategy, brokers)
+    kzclient.watch_individual_node(this_sub_broker_node_path, watch_subscriber_broker_assignment_change)    
 
+def watch_subscriber_broker_assignment_change(event):
+    print("Broker assignment changed")    
+    broker_strategy_reconnect_and_receive()
+
+def initialize_subscriber(topics):
+    topics_str = ','.join(topics)
+    global this_subscriber_path
+    this_subscriber_path = kzclient.create_node(subscribers_path_prefix, topics_str, True, True)
+    this_subscriber_name = get_this_subscriber_name()
+
+    global this_sub_broker_node_path
+    this_sub_broker_node_path = kzclient.create_node(subs_broker_assignment_root + "/" + this_subscriber_name, None, True)
+    for topic in topics:
+        topic_value = kzclient.get_node_value(topic_root_path + "/" + topic)        
+        if topic_value is not None:
+            topic_pubs = []
+            topic_subs = []
+            topic_pubs_subs = topic_value.split('#')
+            if len(topic_pubs_subs) > 1:
+                topic_pubs = topic_pubs_subs[0].split(',')
+                topic_subs = topic_pubs_subs[1].split(',')
+            elif len(topic_pubs_subs) == 1:
+                topic_pubs = topic_pubs_subs[0].split(',')
+
+            if topic_subs.count(this_subscriber_name) == 0:
+                topic_subs.append(this_subscriber_name)
+            
+            if topic_pubs.count("") > 0:
+                topic_pubs.remove("")
+            
+            if topic_subs.count("") > 0:
+                topic_subs.remove("")
+
+            if len(topic_pubs) > 0 and len(topic_subs) > 0:
+                kzclient.set_node_value(topic_root_path + "/" + topic, ','.join(topic_pubs) + '#' + ','.join(topic_subs))   
+            if len(topic_pubs) == 0 and len(topic_subs) > 0:
+                kzclient.set_node_value(topic_root_path + "/" + topic, '#' + ','.join(topic_subs))             
+        else:
+            kzclient.create_node(topic_root_path + "/" + topic, '#' + this_subscriber_name)
+    
+    kzclient.watch_individual_node(this_sub_broker_node_path, watch_subscriber_broker_assignment_change)
+
+def get_this_subscriber_name():
+    return this_subscriber_path[len(this_subscriber_path) - 14:]
 
 # Start the message pump based upon messaging strategy
 if strategy == "direct":
     get_publishers(broker_ip_port)
 elif strategy == "broker":
-    broker_strategy_reconnect_and_receive()
+    initialize_subscriber(subscribed_topics)
 
 while True:
     time.sleep(10)

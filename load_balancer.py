@@ -8,6 +8,7 @@ pubs_root_path = "/pubs"
 subs_root_path = "/subs"
 
 pubs_broker_assignment_root = "/pubsbroker"
+subs_broker_assignment_root = "/subsbroker"
 brokers_ip_port_root_path = "/brokers_ipport"
 
 brokers = []
@@ -16,9 +17,11 @@ topics_being_watched = []
 
 zkclient = kzcli.ZkClientService()
 brokers = zkclient.get_children(brokers_root_path)
-brokers.sort()
+if brokers is not None and len(brokers) > 0:
+    brokers.sort()
 
 publishers_topics_map = {}
+subscribers_topics_map = {}
 
 def bootstrap_root_nodes():
     zkclient.create_node(brokers_root_path)
@@ -30,6 +33,7 @@ bootstrap_root_nodes()
 
 def watch_brokers_root(event): 
     global brokers   
+
     brokers = zkclient.get_children(brokers_root_path)
     brokers.sort()
     #If no broker is in active state, make one active
@@ -50,31 +54,7 @@ def load_balance_brokers(target_brokers_count):
     #get number of active brokers
     activate_broker_count = get_active_broker_count()
 
-    #if target broker count == active broker count, then no load balancing required
-    if activate_broker_count == target_brokers_count:
-        return
-
     need_broker_reassignment = False
-    #if target broker count >= number of brokers, then make all inactive broker active  
-    if target_brokers_count >= len(brokers):
-        for broker in brokers:
-            broker_state = zkclient.get_node_value(brokers_root_path + "/" + broker)
-            if broker_state == "0":
-                need_broker_reassignment = True
-                update_broker_state(broker, "1")
-    
-    #if the target broker count < number of brokers in the system, then deactivate some of the brokers
-    elif target_brokers_count < len(brokers):
-        number_of_brokers_to_deactivate = len(brokers) - target_brokers_count
-        counter = len(brokers) - 1
-        while(counter >= 0 and number_of_brokers_to_deactivate > 0):
-            broker_fromend = brokers[counter]
-            broker_state = zkclient.get_node_value(brokers_root_path + "/" + broker_fromend)
-            if broker_state == "1":
-                need_broker_reassignment = True
-                update_broker_state(broker_fromend, "0")
-                number_of_brokers_to_deactivate = number_of_brokers_to_deactivate - 1
-            counter = counter - 1
     # Keep at least one broker active in the system even if there're no topics being published
     if len(brokers) > 0 and target_brokers_count == 0:
         for broker in brokers:
@@ -84,8 +64,34 @@ def load_balance_brokers(target_brokers_count):
         need_broker_reassignment = True
         update_broker_state(brokers[0], "1")
 
+    #if target broker count == active broker count, then no load balancing required
+    if target_brokers_count > 0 and activate_broker_count == target_brokers_count:
+        return
+    
+    #if target broker count >= number of brokers, then make all inactive broker active  
+    if target_brokers_count >= len(brokers):
+        for broker in brokers:
+            broker_state = zkclient.get_node_value(brokers_root_path + "/" + broker)
+            if broker_state == "0":
+                need_broker_reassignment = True
+                update_broker_state(broker, "1")
+    
+    #if the target broker count < number of brokers in the system, then deactivate some of the brokers
+    elif target_brokers_count > 0 and target_brokers_count < len(brokers):
+        number_of_brokers_to_deactivate = len(brokers) - target_brokers_count
+        counter = len(brokers) - 1
+        while(counter >= 0 and number_of_brokers_to_deactivate > 0):
+            broker_fromend = brokers[counter]
+            broker_state = zkclient.get_node_value(brokers_root_path + "/" + broker_fromend)
+            if broker_state == "1":
+                need_broker_reassignment = True
+                update_broker_state(broker_fromend, "0")
+                number_of_brokers_to_deactivate = number_of_brokers_to_deactivate - 1
+            counter = counter - 1    
+
     if need_broker_reassignment:
         do_pubs_broker_assignment()
+        do_subs_broker_assignment()
 
 def do_pubs_broker_assignment():
     publishers = zkclient.get_children(pubs_root_path)
@@ -114,13 +120,12 @@ def do_pubs_broker_assignment():
         publisher_end_Index = publisher_end_Index - 1
         active_broker_endIndex = active_broker_endIndex - 1
 
-def get_active_broker_count():
-    if brokers is None:
-        return 0
+def get_active_broker_count():    
     return len(get_active_brokers()) 
 
 def get_active_brokers():
     active_brokers = []
+    brokers = zkclient.get_children(brokers_root_path)
     if brokers is None:
         return active_brokers
 
@@ -197,8 +202,7 @@ def update_publishers_topics_maps(pubs):
         return
     for pub in pubs:
         pub_topics = zkclient.get_node_value(pubs_root_path + "/" + pub)          
-        publishers_topics_map[pub] = pub_topics
-        
+        publishers_topics_map[pub] = pub_topics        
 
 def watch_individual_pub_node(event):
     global publishers_topics_map
@@ -208,9 +212,35 @@ def watch_individual_pub_node(event):
         if pub_node_name in publishers_topics_map:
             published_topics = publishers_topics_map[pub_node_name].split(',')
             for topic in published_topics:
-                topic_pubs = zkclient.get_node_value(topic_root_path + "/" + topic).split(',')
-                if topic_pubs.count(pub_node_name) > 0:
-                    topic_pubs.remove(pub_node_name)
+                topic_node_value = zkclient.get_node_value(topic_root_path + "/" + topic)
+                if topic_node_value is not None:
+                    topic_pubs_subs = topic_node_value.split('#')
+                    topic_pubs = []
+                    topic_subs = []
+                    if len(topic_pubs_subs) > 1:
+                        topic_pubs = topic_pubs_subs[0].split(',')
+                        topic_subs = topic_pubs_subs[1].split(',')
+                    elif len(topic_pubs_subs) == 1:
+                        topic_pubs = topic_pubs_subs[0].split(',')
+
+                    if topic_pubs.count(pub_node_name) > 0:
+                        topic_pubs.remove(pub_node_name)
+
+                    if topic_pubs.count("") > 0:
+                        topic_pubs.remove("")
+            
+                    if topic_subs.count("") > 0:
+                        topic_subs.remove("")
+
+                    if len(topic_pubs) > 0 and len(topic_subs) > 0:
+                        zkclient.set_node_value(topic_root_path + "/" + topic, ",".join(topic_pubs) + "#" + ",".join(topic_subs))
+                    elif len(topic_pubs) == 0 and len(topic_subs) > 0:
+                        zkclient.set_node_value(topic_root_path + "/" + topic, "#" + ",".join(topic_subs))
+                    elif len(topic_subs) == 0 and len(topic_pubs) > 0:
+                        zkclient.set_node_value(topic_root_path + "/" + topic, ",".join(topic_pubs))
+                    elif len(topic_pubs) == 0 and len(topic_subs) == 0:
+                        zkclient.delete_node(topic_root_path + "/" + topic)                   
+
             publishers_topics_map.pop(pub_node_name) 
     else:
         publishers_topics_map[pub_node_name] = zkclient.get_node_value(pub_node_path)
@@ -228,6 +258,92 @@ def watch_pubs_root(event):
 
 #setup watch on pubs root
 zkclient.watch_node(pubs_root_path, watch_pubs_root)
+
+
+#Subscriber watch
+def update_sublishers_topics_maps(subs):
+    if subs is None or len(subs) == 0:
+        return
+    for sub in subs:
+        sub_topics = zkclient.get_node_value(subs_root_path + "/" + sub)          
+        subscribers_topics_map[sub] = sub_topics
+
+def watch_subs_root(event):
+    all_subs = zkclient.get_children(subs_root_path)
+    update_sublishers_topics_maps(all_subs)
+    if all_subs is not None:
+        for sub in all_subs:
+            zkclient.watch_individual_node(subs_root_path + "/" + sub, watch_individual_sub_node)
+    do_subs_broker_assignment()
+    zkclient.watch_node(subs_root_path, watch_subs_root)
+
+def do_subs_broker_assignment():
+    subscribers = zkclient.get_children(subs_root_path)
+
+    if subscribers is None or len(subscribers) == 0:
+        return
+    subscribers.sort()
+    active_brokers = get_active_brokers()
+
+    if active_brokers is None or len(active_brokers) == 0:
+        return
+    active_brokers.sort()
+
+    active_broker_endIndex = len(active_brokers) - 1
+    subscriber_end_Index = len(subscribers) - 1
+    while subscriber_end_Index >= 0:
+        sub_name = subscribers[subscriber_end_Index]
+        if active_broker_endIndex < 0:
+            active_broker_endIndex = len(active_brokers) - 1
+        
+        active_broker_name = active_brokers[active_broker_endIndex]
+        activate_broker_node_value = zkclient.get_node_value(brokers_ip_port_root_path + '/' + active_broker_name)     
+
+        zkclient.set_node_value(subs_broker_assignment_root + '/' + sub_name,  activate_broker_node_value)
+
+        subscriber_end_Index = subscriber_end_Index - 1
+        active_broker_endIndex = active_broker_endIndex - 1
+
+def watch_individual_sub_node(event):
+    global subscribers_topics_map
+    sub_node_path = event.path
+    sub_node_name = sub_node_path.split('/')[len(sub_node_path.split('/')) - 1]
+    if event.type == "DELETED":
+        if sub_node_name in subscribers_topics_map:
+            subscribed_topics = subscribers_topics_map[sub_node_name].split(',')
+            for topic in subscribed_topics:
+                topic_node_value = zkclient.get_node_value(topic_root_path + "/" + topic)
+                if topic_node_value is not None:
+                    topic_pubs_subs = topic_node_value.split('#')
+                    topic_pubs = topic_pubs_subs[0].split(',')
+                    topic_subs = []
+                    if len(topic_pubs_subs) > 1:
+                       topic_subs = topic_pubs_subs[1].split(',')
+
+                    if topic_subs.count(sub_node_name) > 0:
+                        topic_subs.remove(sub_node_name)
+
+                    if topic_pubs.count("") > 0:
+                        topic_pubs.remove("")
+            
+                    if topic_subs.count("") > 0:
+                        topic_subs.remove("")
+
+                    if len(topic_subs) > 0 and len(topic_pubs) > 0:
+                        zkclient.set_node_value(topic_root_path + "/" + topic, ",".join(topic_pubs) + "#" + ",".join(topic_subs))
+                    elif len(topic_pubs) == 0 and len(topic_subs) > 0:
+                        zkclient.set_node_value(topic_root_path + "/" + topic, "#" + ",".join(topic_subs))
+                    elif len(topic_subs) == 0 and len(topic_pubs) > 0:
+                        zkclient.set_node_value(topic_root_path + "/" + topic, ",".join(topic_pubs))
+                    elif len(topic_pubs) == 0 and len(topic_subs) == 0:
+                        zkclient.delete_node(topic_root_path + "/" + topic)
+            subscribers_topics_map.pop(sub_node_name) 
+    else:
+        subscribers_topics_map[sub_node_name] = zkclient.get_node_value(sub_node_path)
+        zkclient.watch_individual_node(subs_root_path + "/" + sub_node_name, watch_individual_pub_node)
+
+#setup watch on pubs root
+zkclient.watch_node(subs_root_path, watch_subs_root)
 
 #Block the thread to receive the node callbacks
 while True:
