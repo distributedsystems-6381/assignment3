@@ -20,6 +20,7 @@ pubs_broker_assignment_root = "/pubsbroker"
 
 publishers_path_prefix = "/pubs/pub_"
 this_publisher_path = ""
+this_publisher_name = ""
 this_pub_broker_node_path = ""
 active_broker_node_value = ""
 process_list = []
@@ -60,7 +61,7 @@ def publish(strategy, topics):
 
         for topic in topics:
             topic_data = topic_data_provider(topic)
-            strategy.publish(topic, topic_data)
+            strategy.publish(topic, topic_data + "~" + this_publisher_name)
         time.sleep(1)
 
 # direct implementation
@@ -172,6 +173,7 @@ def initialize_publisher(topics):
     topics_str = ','.join(topics)
     global this_publisher_path
     this_publisher_path = kzclient.create_node(publishers_path_prefix, topics_str, True, True)
+    global this_publisher_name
     this_publisher_name = get_this_publisher_name()
 
     global this_pub_broker_node_path
