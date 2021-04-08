@@ -48,45 +48,22 @@ python3 `which mn`
    - be sure to note the IP of the host that you choose so that the publishers and subscribers can contact zookeeper
      - `sudo ./bin/zkServer.sh start-foreground`
 
-***To run the publisher and subscriber - direct implementation:***
+***Load balancing threshold***
+- If a topic gets published and subscribed by > 1 publisher and subscriber respectively, the broker intances are scaled out by the load balancer
+- The broker is scaled in if a topic publisher or subscriber becomes < 1
+
+***Load balancing scenario***
 1. Change directories to your workspace and clone this project 
    ```
    cd ~/workspace
-   git clone https://github.com/distributedsystems-6381/assignment2-faulttolerant-pubsub
-   cd assignment2-faulttolerant-pubsub
+   git clone https://github.com/distributedsystems-6381/assignment3.git
+   cd assignment3
    ```
-1. Run publishers by executing the below commnad:  
+1. Run load balancer by executing the below commnad:  
      ```
-      python3 publisher_app.py direct "{zookeeper_ip_port}" "{publisher's_topics_publishing_port}" "{topic_name_1}" "{topic_name_2}"....."{topic_name_n}"
-     ```
-      e.g.:
-     ```
-     python3 publisher_app.py direct "10.0.0.1:2181" "2000" "topic1" "topic2"
-     ```
-1. Run lamebrokers by executing below command:  
-     ```
-     python3 lamebroker.py {broker_req_response_binding_port}
-     ```
-     e.g.:
-     ```
-     python3 lamebroker.py 3000
-     ```
- 1. Run subscriber by running command:    
-     ```
-     python3 subscriber_app.py direct "{zookeeper_ip_port}" "{topic_name_1}" "{topic_name_2}"....."{topic_name_n}"
-     ```
-     e.g.:
-     ```
-     python3 subscriber_app.py direct "10.0.0.1:2181" "topic1"
-     ``` 
-***Command to run brokers, publishers and subscribers - broker implementation:***
-1. Change directories to your workspace and clone this project 
-   ```
-   cd ~/workspace
-   git clone https://github.com/distributedsystems-6381/assignment2-faulttolerant-pubsub
-   cd assignment2-faulttolerant-pubsub
-   ```
-1. Run brokers by executing the below commnad:  
+      python3 load_balancer.py
+     ```    
+1. Run 3 replica of the broker
      ```
       python3 broker.py "{listening_port_for_the_publishers}" "{publishing_port_for_the_subscribers}"
      ```
@@ -94,15 +71,26 @@ python3 `which mn`
      ```
       python3 broker.py 2000 2001
      ```
-1. Run publishers by executing below command:  
+ 1. Run 2 instances of "topic1" publisher by running command:    
      ```
-     python3 publisher_app.py broker "{zookeeper_ip_port}" "{topic_name_1}" "{topic_name_2}"....."{topic_name_n}"
+     python3 subscriber_app.py direct "{zookeeper_ip_port}" "{topic_name_1}"
      ```
      e.g.:
      ```
-     python3 publisher_app.py broker "10.0.0.1:2181" "topic1" "topic2"
+     python3 publisher_app.py broker "27.0.0.1:2181" "topic1"
+     ``` 
+  1. Run 1 instances of "topic1" subscriber by running command
+      ```
+     python3 subscriber_app.py broker "{zookeeper_ip_port}" "{topic_name_1}" "{topic_name_2}"....."{topic_name_n}"
      ```
-1. Run subscriber by running below command:     
+     e.g.:
+     ```
+     python3 subscriber_app.py broker "10.0.0.1:2181" "topic1"
+     ``` 
+     ```
+     Note: Notice that there's is still only one active broker instance
+     ```
+  1. Run another instance of "topic1" subscriber by running command
      ```
      python3 subscriber_app.py broker "{zookeeper_ip_port}" "{topic_name_1}" "{topic_name_2}"....."{topic_name_n}"
      ```
@@ -110,30 +98,34 @@ python3 `which mn`
      ```
      python3 subscriber_app.py broker "10.0.0.1:2181" "topic1"
      ``` 
-     
-_**NOTES**_
-   - By default, the publisher app publishes messages to 2 topics
-   - Temperature (temp) and humidity by calling the method `publish(topic, message)` via the publisher middleware API
-   - To publish the data to any other topics, please include the additional topic parameter, and there will be rnadom data between 100 and 200 will be published for these topics.
-   - The subscriber registers the topics via the subscriber middleware API and uses a callback method to receive the data for the registered topics
-   - When the subscriber middleware receives topic data from the publisher related to the subscriber's registered topics, it passes the data to subscriber app by calling the registered callback function
+     ```
+     Note: Notice that now there will be 2 active broker becuse topic1 is published and subscribed by > 1 publishers and subscribers
+     ```
+  1. Terminate publisher and/or subscriber by pressing Ctrl+C:   
+     ```
+     Note: Notice that the second instance of the broker will be deactivated
+     ```
 
-***Test Scenarios for Direct Implementation:***
-- Start one publisher publishing "topic1" and "topic2"
-- Run two instances of the lamebroker process
-- Start a subscriber listening for "topic2"
-- Start another publisher publishing "topic2", lamebroker will refresh the list of publishers
-- Kill one broker process by keyboard interrupt e.g. "Ctrl + C", the second broker will resume the role of the leader	
-- The subscriber will be notified of the broker change and will refresh the publishers from the new broker
-- Stop all brokers, the subscriber will be notified of no brokers in the system and will shut down
-	
-***Test Scenarios for Broker Implementation:***
-- Start two brokers, the broker with minimum sequence node will become the leader
-- Run two instances of the publishers publishing "topic1" and "topic2"
-- Start a subscriber listening for "topic2"
-- Stop the current leader broker process, the second broker will become the leader
-- The topic publishers and subscribers will be notified of the broker change and will reconnect to the new broker node and start receiving the topics			- 
-- Stop all brokers, the subscriber will shut down with the message there's no broker in the system	
-
+***Ownership strength scenario***
+- Run load balancer
+- Run at leasr 1 broker
+- Start one publisher publishing "topic1"
+- Start another publisher publishing "topic1"
+- Start a subscriber listening for "topic1"
+    ```
+    Note: please notice that the subscriber will receive messages from the publisher having higher ownership strenth i.e the one who started publishing topic1 earlier
+    ```
+***Ownership strength scenario***
+- Run load balancer
+- Run at leasr 1 broker
+- Start one publisher publishing "topic1:10" (note: 10 is the history QoS samples)
+- Start a subscriber listening for "topic1:20"
+    ```
+    Note: please notice that the subscriber doesn't receive the messages
+    ```
+- Stop the subscriber and start again subscribing "topic1:10"
+    ```
+    Note: please notice that the subscriber starts receving the messages now
+    ```
 ***Logging and Graph:*** 
    Running subscriber app generates a comma seperated log text file at the root of the project containing publisher_ip, subscriber_ip, message_id and time taken in milliseconds to receive the message from publisher. The graph and it's test data for the above test scenarios are located in the folder /perf-data-graphs
