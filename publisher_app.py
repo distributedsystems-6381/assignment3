@@ -150,6 +150,11 @@ def broker_strategy_reconnect_and_publish():
     else:
         active_broker_node_value = assigned_broker_node_value
 
+    if len(process_list) > 0:
+        thr = process_list[0]
+        thr.terminate()
+        process_list.pop(0)
+
     broker_ip = active_broker_node_value.split(':')[0]
     broker_listening_port = active_broker_node_value.split(':')[1].split(',')[0]
     active_broker_ip_port = broker_ip + ":" + broker_listening_port
@@ -160,11 +165,7 @@ def broker_strategy_reconnect_and_publish():
     kzclient.watch_individual_node(this_pub_broker_node_path, watch_publisher_broker_assignment_change)
 
 def watch_publisher_broker_assignment_change(event):
-    print("Broker assignment changed")
-    if len(process_list) > 0:
-        thr = process_list[0]
-        thr.terminate()
-        process_list.pop(0)
+    print("Broker assignment chage request")    
     broker_strategy_reconnect_and_publish()
 
 def initialize_publisher(topics):
@@ -179,15 +180,27 @@ def initialize_publisher(topics):
         topic_value = kzclient.get_node_value(topic_root_path + "/" + topic)        
         if topic_value is not None:
             topic_pubs = []
+            topic_subs = []
             topic_pubs_subs = topic_value.split('#')
-            if len(topic_pubs_subs) == 1:
-                topic_pubs = topic_pubs_subs
-            else:
-                topic_pubs = topic_pubs_subs[0]
+            if len(topic_pubs_subs) > 1:
+                topic_pubs = topic_pubs_subs[0].split(',')
+                topic_subs = topic_pubs_subs[1].split(',')           
+            elif len(topic_pubs_subs) == 1:
+                topic_pubs = topic_pubs_subs[0].split(',')
 
             if topic_pubs.count(this_publisher_name) == 0:
                 topic_pubs.append(this_publisher_name)
-                kzclient.set_node_value(topic_root_path + "/" + topic, ','.join(topic_pubs))                
+            
+            if topic_pubs.count("") > 0:
+                topic_pubs.remove("")
+            
+            if topic_subs.count("") > 0:
+                topic_subs.remove("")
+
+            if len(topic_pubs) > 0 and len(topic_subs) > 0:
+                kzclient.set_node_value(topic_root_path + "/" + topic, ','.join(topic_pubs) + '#' + ','.join(topic_subs))   
+            if len(topic_pubs) > 0 and len(topic_subs) == 0:
+                kzclient.set_node_value(topic_root_path + "/" + topic, ','.join(topic_pubs))             
         else:
             kzclient.create_node(topic_root_path + "/" + topic, this_publisher_name)
     

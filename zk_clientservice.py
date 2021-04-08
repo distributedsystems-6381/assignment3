@@ -105,6 +105,10 @@ class ZkClientService():
         else:
             return ""
 
+    def delete_node(self, node_path):
+        if self.kzclient.exists(node_path):
+            self.kzclient.delete(node_path,recursive=True)            
+
     def stop_kzclient(self):
         self.kzclient.stop()
 

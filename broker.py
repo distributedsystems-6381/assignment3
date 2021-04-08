@@ -39,8 +39,8 @@ def run_broker(listening_port, publishing_port):
     finally:
         pass
         frontend.close()
-        backend.close()
-        context.term()
+        #backend.close()
+        #context.term()
 
 def create_broker_node():
     global this_broker_node_path
@@ -56,10 +56,18 @@ def get_this_broker_name(this_broker_node_path):
 
 def watch_broker_node_change(event):
     if event.type == "DELETED":
+        if len(process_list) > 0:
+            thr = process_list[0]
+            thr.terminate()
+            process_list.pop(0)
         return
     broker_node_value = zkclient.get_node_value(this_broker_node_path)
     if broker_node_value == "1":
         print("Promoting {} as active broker".format(this_broker_node_path))
+        if len(process_list) > 0:
+            thr = process_list[0]
+            thr.terminate()
+            process_list.pop(0)
         thr = mp.Process(target=run_broker, args=(listen, publish))
         process_list.append(thr)
         thr.start()        
