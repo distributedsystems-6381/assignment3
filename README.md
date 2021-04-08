@@ -115,7 +115,7 @@ python3 `which mn`
     ```
     Note: please notice that the subscriber will receive messages from the publisher having higher ownership strenth i.e the one who started publishing topic1 earlier
     ```
-***Ownership strength scenario***
+***Samples History QoS scenario***
 - Run load balancer
 - Run at leasr 1 broker
 - Start one publisher publishing "topic1:10" (note: 10 is the history QoS samples)
