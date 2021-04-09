@@ -90,6 +90,9 @@ python3 `which mn`
      ```
      Note: Notice that there's is still only one active broker instance
      ```
+     ```
+     Note: {ownership_strength} can be either "0" or "1"
+     ```
   1. Run another instance of "topic1" subscriber by running command
      ```
      python3 subscriber_app.py broker "{zookeeper_ip_port}" "{ownership_strength}" "{topic_name_1}" "{topic_name_2}"....."{topic_name_n}"
@@ -111,13 +114,10 @@ python3 `which mn`
 - Run at leasr 1 broker
 - Start one publisher publishing "topic1"
 - Start another publisher publishing "topic1"
-- Start a subscriber listening for "topic1" by ownership_strength set to "1" e.g.
-   ```
-   python3 subscriber_app.py broker "{zookeeper_ip_port}" "{ownership_strength}" "{topic_name_1}" "{topic_name_2}"....."{topic_name_n}"
-   ```
+- Start a subscriber listening for "topic1" by ownership_strength set to "1"   
      e.g.:
      ```
-     python3 subscriber_app.py broker "10.0.0.1:2181" "0" "topic1"
+     python3 subscriber_app.py broker "10.0.0.1:2181" "1" "topic1"
      ``` 
     ```
     Note: please notice that the subscriber will receive messages from the publisher having higher ownership strenth i.e the one who started publishing topic1 earlier
