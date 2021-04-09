@@ -75,19 +75,25 @@ def load_balance_brokers(target_brokers_count):
             if broker_state == "0":
                 need_broker_reassignment = True
                 update_broker_state(broker, "1")
+    #if active broker count is less than target broker count
+    elif target_brokers_count > 0 and target_brokers_count < len(brokers) and activate_broker_count < target_brokers_count:
+        counter = activate_broker_count       
+        for broker in brokers:
+            broker_state = zkclient.get_node_value(brokers_root_path + "/" + broker)
+            if broker_state == "0" and counter < target_brokers_count:
+                need_broker_reassignment = True
+                update_broker_state(broker, "1")
+                counter = counter + 1
     
     #if the target broker count < number of brokers in the system, then deactivate some of the brokers
-    elif target_brokers_count > 0 and target_brokers_count < len(brokers):
-        number_of_brokers_to_deactivate = len(brokers) - target_brokers_count
-        counter = len(brokers) - 1
-        while(counter >= 0 and number_of_brokers_to_deactivate > 0):
-            broker_fromend = brokers[counter]
-            broker_state = zkclient.get_node_value(brokers_root_path + "/" + broker_fromend)
-            if broker_state == "1":
+    elif target_brokers_count > 0 and target_brokers_count < len(brokers) and activate_broker_count > target_brokers_count:
+        number_of_brokers_to_deactivate = activate_broker_count - target_brokers_count
+        for broker in brokers:
+            broker_state = zkclient.get_node_value(brokers_root_path + "/" + broker)
+            if broker_state == "1" and number_of_brokers_to_deactivate > 0:
                 need_broker_reassignment = True
-                update_broker_state(broker_fromend, "0")
-                number_of_brokers_to_deactivate = number_of_brokers_to_deactivate - 1
-            counter = counter - 1    
+                update_broker_state(broker, "0")
+                number_of_brokers_to_deactivate = number_of_brokers_to_deactivate - 1    
 
     if need_broker_reassignment:
         do_pubs_broker_assignment()
