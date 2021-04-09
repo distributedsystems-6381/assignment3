@@ -29,13 +29,13 @@
             //"args": ["broker", "127.0.0.1:2181", "topic1"]  
 
             //argumets for direct strategy subscribers
-            //e.g. python3 subscriber_app.py direct "27.0.0.1:2181" "topic1"
-            //"args": ["direct", "127.0.0.1:2181", "topic5", "temp", "humidity"]
+            //e.g. python3 subscriber_app.py direct "27.0.0.1:2181" "0" "topic1"
+            //"args": ["direct", "127.0.0.1:2181", "0", "topic5", "temp", "humidity"]
 
             //argumets for broker strategy subscribers
-            //e.g. r
+            //e.g. python3 subscriber_app.py broker "27.0.0.1:2181" "0" "topic1"
             //argumets for broker strategy subscribers
-            "args": ["broker", "127.0.0.1:2181", "topic1"] 
+            "args": ["broker", "127.0.0.1:2181", "0", "topic1"] 
         }
     ]
 }

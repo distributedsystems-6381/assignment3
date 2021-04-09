@@ -21,6 +21,7 @@ this_subscriber_path = ""
 this_sub_broker_node_path = ""
 topic_root_path = "/topics"
 active_broker_node_value = ""
+ownership_strength = "0"
 
 '''
  args python3 {direct or broker} {zookeeper_ip:port} topic1 topic2
@@ -52,10 +53,13 @@ if zookeeper_ip_port == "":
     print("No zookeeper ip:port provided, exiting subscriber application.")
     sys.exit()
 
-# Add topics of interests
+# ownership strength
 subscribed_topics = []
 if len(sys.argv) > 3:
-    for arg in sys.argv[3:]:
+    ownership_strength = sys.argv[3]     
+
+if len(sys.argv) > 4:
+    for arg in sys.argv[4:]:
         subscribed_topics.append(arg)
     print("Topics to subscribe:{}".format(subscribed_topics))
 
@@ -101,7 +105,7 @@ def direct_messaging_strategy(pubs, topics):
 
 def broker_messaging_strategy(brokers, topics):
     # create the BrokerSubscriberMiddleware and register the topics of interest and the notify callback function
-    broker = bmw.BrokerSubMiddleware(brokers)
+    broker = bmw.BrokerSubMiddleware(brokers, ownership_strength)
     broker.register(topics, notify)
 
 
