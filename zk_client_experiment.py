@@ -13,9 +13,11 @@ print(sys.argv)
 
 kzclient = zkcl.ZkClientService()
 
+
 def watch_broker_func(event):
     print("Broker node changed")
     broker_strategy_reconnect_and_publish()
+
 
 def broker_strategy_reconnect_and_publish():
     active_broker_node_name = kzclient.get_broker_node_name(const.LEADER_ELECTION_ROOT_ZNODE)
@@ -23,12 +25,14 @@ def broker_strategy_reconnect_and_publish():
         print("No broker is running, existing the publisher app!")
         os._exit(0)
     active_broker_node_value = kzclient.get_broker(const.LEADER_ELECTION_ROOT_ZNODE)
-    print("Setting watch on leader broker node_path:{}".format(const.LEADER_ELECTION_ROOT_ZNODE + '/' + active_broker_node_name))
-    kzclient.watch_individual_node(const.LEADER_ELECTION_ROOT_ZNODE + '/' + active_broker_node_name, watch_broker_func)   
+    print("Setting watch on leader broker node_path:{}".format(
+        const.LEADER_ELECTION_ROOT_ZNODE + '/' + active_broker_node_name))
+    kzclient.watch_individual_node(const.LEADER_ELECTION_ROOT_ZNODE + '/' + active_broker_node_name, watch_broker_func)
     broker_ip = active_broker_node_value.split(':')[0]
     broker_listening_port = active_broker_node_value.split(':')[1].split(',')[0]
     active_broker_ip_port = broker_ip + ":" + broker_listening_port
     print("Broker leader is:{}".format(active_broker_ip_port))
+
 
 broker_strategy_reconnect_and_publish()
 

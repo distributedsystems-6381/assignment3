@@ -16,19 +16,23 @@ topics_being_watched = []
 zkclient = kzcli.ZkClientService()
 brokers = zkclient.get_children(brokers_root_path)
 
+
 def bootstrap_root_nodes():
     zkclient.create_node(brokers_root_path)
     zkclient.create_node(topic_root_path)
     zkclient.create_node(pubs_root_path)
     zkclient.create_node(subs_root_path)
 
+
 bootstrap_root_nodes()
+
 
 def watch_topics_root(event):
     topics = zkclient.get_children(topic_root_path)
     for topic in topics:
         zkclient.watch_individual_node(topic_root_path + "/" + topic, watch_a_topic_change)
     zkclient.watch_node(topic_root_path, watch_topics_root)
+
 
 def watch_a_topic_change(event):
     print("Broker node changed")
@@ -44,7 +48,9 @@ zkclient.watch_node(topic_root_path, watch_topics_root)
 topics = zkclient.get_children(topic_root_path)
 for topic in topics:
     zkclient.watch_individual_node(topic_root_path + "/" + topic, watch_a_topic_change)
-#zkclient.watch_individual_node(topic_path, watch_a_topic_change)
+
+
+# zkclient.watch_individual_node(topic_path, watch_a_topic_change)
 
 
 def watch_child_change(event):
@@ -60,10 +66,5 @@ def watch_child_change(event):
     zkclient.watch_node(topic_root_path, watch_child_change)
 
 
-
-
-
-
 while True:
     time.sleep(1000000000)
-
