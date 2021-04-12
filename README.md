@@ -43,7 +43,7 @@ python3 `which mn`
 
 **High Level Design:**
 
-![alternativetext](/assignment3-hight-level-design.png)
+![alternativetext](/assignment3-high-level-design.png)
 
 ***To run Zookeeper - required for leader election and fail-over of brokers***
 
@@ -59,7 +59,7 @@ python3 `which mn`
 
 ***Load balancing threshold***
 
-- If a topic gets published and subscribed by > 1 publisher and subscriber respectively, the broker intances are scaled
+- If a topic gets published and subscribed by > 1 publisher and subscriber respectively, the broker instances are scaled
   out by the load balancer
 - The broker is scaled in if a topic publisher or subscriber becomes < 1
 
@@ -71,28 +71,28 @@ python3 `which mn`
    git clone https://github.com/distributedsystems-6381/assignment3.git
    cd assignment3
    ```
-1. Run load balancer by executing the below commnad:
-     ```
-      python3 load_balancer.py
-     ```    
+1. Run load balancer by executing the below command:
+   ```
+   python3 load_balancer.py
+   ```    
 1. Run 3 replica of the broker
-     ```
-      python3 broker.py "{listening_port_for_the_publishers}" "{publishing_port_for_the_subscribers}"
-     ```
+   ```
+   python3 broker.py "{listening_port_for_the_publishers}" "{publishing_port_for_the_subscribers}"
+   ```
    e.g.:
-     ```
-      python3 broker.py 2000 2001
-     ```
+   ```
+   python3 broker.py 2000 2001
+   ```
 1. Run 2 instances of "topic1" publisher by running command:
-    ```
-    python3 subscriber_app.py direct "{zookeeper_ip_port}" "{topic_name_1}"
-    ```
+   ```
+   python3 subscriber_app.py direct "{zookeeper_ip_port}" "{topic_name_1}"
+   ```
    e.g.:
-    ```
-    python3 publisher_app.py broker "10.0.0.1:2181" "topic1"
-    ``` 
+   ```
+   python3 publisher_app.py broker "10.0.0.1:2181" "topic1"
+   ``` 
 1. Run 1 instances of "topic1" subscriber by running command
-    ```
+   ```
    python3 subscriber_app.py broker "{zookeeper_ip_port}" "{ownership_strength}" "{topic_name_1}" "{topic_name_2}"....."{topic_name_n}"
    ```
    e.g.:
@@ -129,12 +129,12 @@ python3 `which mn`
 - Start another publisher publishing "topic1"
 - Start a subscriber listening for "topic1" by ownership_strength set to "1"   
   e.g.:
-     ```
-     python3 subscriber_app.py broker "10.0.0.1:2181" "1" "topic1"
-     ``` 
-    ```
-    Note: please notice that the subscriber will receive messages from the publisher having higher ownership strenth i.e the one who started publishing topic1 earlier
-    ```
+   ```
+   python3 subscriber_app.py broker "10.0.0.1:2181" "1" "topic1"
+   ``` 
+   ```
+   Note: please notice that the subscriber will receive messages from the publisher having higher ownership strenth i.e the one who started publishing topic1 earlier
+   ```
 
 ***Samples History QoS scenario***
 
@@ -142,15 +142,15 @@ python3 `which mn`
 - Run at least 1 broker
 - Start one publisher, publishing "topic1:10" (note: 10 is the history QoS samples)
 - Start a subscriber, listening for "topic1:20"
-    ```
-    Note: please notice that the subscriber doesn't receive the messages
-    ```
+   ```
+   Note: please notice that the subscriber doesn't receive the messages
+   ```
 - Stop the subscriber and start again subscribing "topic1:10"
-    ```
-    Note: please notice that the subscriber starts receving the messages now
-    ```
+   ```
+   Note: please notice that the subscriber starts receving the messages now
+   ```
 
 ***Logging and Graph:***
 Running subscriber app generates a comma separated log text file at the root of the project containing publisher_ip,
-subscriber_ip, message_id and time taken in milliseconds to receive the message from publisher. The graph and it's test
+subscriber_ip, message_id and time taken in milliseconds to receive the message from publisher. The graph and its test
 data for the above test scenarios are located in the folder /perf-data-graphs
