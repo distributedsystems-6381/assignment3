@@ -85,7 +85,7 @@ python3 `which mn`
    ```
 1. Run 2 instances of "topic1" publisher by running command:
    ```
-   python3 subscriber_app.py direct "{zookeeper_ip_port}" "{topic_name_1}"
+   python3 publisher_app.py broker "{zookeeper_ip_port}" "{topic_name_1}"
    ```
    e.g.:
    ```
@@ -114,7 +114,7 @@ python3 `which mn`
    python3 subscriber_app.py broker "10.0.0.1:2181" "0" "topic1"
    ``` 
    ```
-   Note: Notice that now there will be 2 active broker becuse topic1 is published and subscribed by > 1 publishers and subscribers
+   Note: Notice that now there will be 2 active broker because topic1 is published and subscribed by > 1 publishers and subscribers
    ```
 1. Terminate publisher and/or subscriber by pressing Ctrl+C:
    ```
