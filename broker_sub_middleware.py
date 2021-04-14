@@ -40,16 +40,16 @@ class BrokerSubMiddleware():
             sockets = dict(poller.poll())
             for socket in sockets:
                 message = socket.recv_string()
-                find_val = message.find('#')                
+                find_val = message.find('#')
                 topic = message[0:find_val]
-                                
-                messagedata = message[find_val + 1:]                
+
+                messagedata = message[find_val + 1:]
                 if self.ownership_strength == "1":
                     topic_pubs_value = self.zkclient.get_node_value("/topics/" + topic)
                     topic_pubs = []
                     if topic_pubs_value is not None:
-                        topic_pubs =  topic_pubs_value.split('#')[0].split(',')
-                        if topic_pubs.count("") > 0:                       
+                        topic_pubs = topic_pubs_value.split('#')[0].split(',')
+                        if topic_pubs.count("") > 0:
                             topic_pubs.remove("")
                         topic_pubs.sort()
                     if len(topic_pubs) > 0 and messagedata.find(topic_pubs[0]) > 0:
@@ -57,5 +57,5 @@ class BrokerSubMiddleware():
                         if self.notifyCallback != None:
                             self.notifyCallback(topic, messagedata)
                 else:
-                     if self.notifyCallback != None:
-                            self.notifyCallback(topic, messagedata)
+                    if self.notifyCallback != None:
+                        self.notifyCallback(topic, messagedata)
